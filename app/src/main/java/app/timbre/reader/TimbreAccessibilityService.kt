@@ -350,7 +350,7 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
         val near = hypot(rawX - cx, rawY - cy) < dp(100f)
         if (near != overDismiss) {
             overDismiss = near
-            dismissView?.hovered = near
+            dismissView?.dropHighlighted = near
             wrap.animate().scaleX(if (near) 1.15f else 1f)
                 .scaleY(if (near) 1.15f else 1f).setDuration(120).start()
             if (near) haptic(HAPTIC_TICK)
