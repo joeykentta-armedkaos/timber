@@ -19,6 +19,8 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import kotlin.math.hypot
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Timbre's floating bubble, drawn as an accessibility overlay so it works on
@@ -72,6 +74,23 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
     private var lastSelection: String = ""
     private var lastSelectionAt = 0L
     private val speakSelectionRunnable = Runnable { speakCachedSelection() }
+
+    // While armed, actively poll for a selection instead of relying only on
+    // TYPE_VIEW_TEXT_SELECTION_CHANGED — many apps (notably browsers) never
+    // fire that event for non-editable text.
+    private val pollSelectionRunnable = object : Runnable {
+        override fun run() {
+            if (!armed) return
+            val sel = findSelectionInAllWindows()
+            if (!sel.isNullOrBlank() && sel != lastSelection) {
+                lastSelection = sel
+                lastSelectionAt = System.currentTimeMillis()
+                main.removeCallbacks(speakSelectionRunnable)
+                main.postDelayed(speakSelectionRunnable, 450)
+            }
+            main.postDelayed(this, 400)
+        }
+    }
 
     // idle tuck
     private val tuckRunnable = Runnable { tuck(true) }
@@ -226,11 +245,15 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
         // If the user selected text just before holding, start with that.
         main.removeCallbacks(speakSelectionRunnable)
         main.postDelayed(speakSelectionRunnable, 350)
+        // And keep checking for new selections while held.
+        main.removeCallbacks(pollSelectionRunnable)
+        main.postDelayed(pollSelectionRunnable, 400)
     }
 
     private fun disarm() {
         armed = false
         main.removeCallbacks(speakSelectionRunnable)
+        main.removeCallbacks(pollSelectionRunnable)
         engine?.stop()
         bubble?.state = BubbleView.State.IDLE
         haptic(HAPTIC_TICK)
@@ -374,10 +397,13 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED) return
         val node = event.source ?: return
         val text = node.text?.toString()
-        val s = node.textSelectionStart
-        val e = node.textSelectionEnd
+        // Normalize: Android reports start > end for right-to-left drags.
+        val s = min(node.textSelectionStart, node.textSelectionEnd)
+        val e = max(node.textSelectionStart, node.textSelectionEnd)
         if (!text.isNullOrEmpty() && s in 0 until e && e <= text.length) {
-            lastSelection = text.substring(s, e)
+            val sel = text.substring(s, e)
+            if (sel == lastSelection) return
+            lastSelection = sel
             lastSelectionAt = System.currentTimeMillis()
             if (armed) {
                 // live re-speak as the selection grows, debounced
@@ -394,10 +420,16 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
     }
 
     private fun speakCurrentSelection() {
-        // Prefer a fresh cache (selection made in the last 30s), else scan.
+        // Prefer a live scan (what's selected right now), else a fresh cache
+        // (selection made in the last 30s) for apps that dropped the visual
+        // selection when focus shifted.
+        val scanned = findSelectionInAllWindows()
         val fresh = System.currentTimeMillis() - lastSelectionAt < 30_000
-        val text = if (fresh && lastSelection.isNotBlank()) lastSelection
-        else findSelectedText(rootInActiveWindow)
+        val text = when {
+            !scanned.isNullOrBlank() -> scanned
+            fresh && lastSelection.isNotBlank() -> lastSelection
+            else -> null
+        }
         if (text.isNullOrBlank()) {
             haptic(HAPTIC_DOUBLE_CLICK) // "nothing found"
             return
@@ -405,12 +437,23 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
         speakText(text)
     }
 
+    /** Scan the active window first, then every interactive window. */
+    private fun findSelectionInAllWindows(): String? {
+        findSelectedText(rootInActiveWindow)?.let { return it }
+        for (w in windows) {
+            val root = w.root ?: continue
+            findSelectedText(root)?.let { return it }
+        }
+        return null
+    }
+
     /** Depth-first scan for a node with an active text selection. */
     private fun findSelectedText(root: AccessibilityNodeInfo?, depth: Int = 0): String? {
         if (root == null || depth > 24) return null
         val t = root.text?.toString()
-        val s = root.textSelectionStart
-        val e = root.textSelectionEnd
+        // Normalize: Android reports start > end for right-to-left drags.
+        val s = min(root.textSelectionStart, root.textSelectionEnd)
+        val e = max(root.textSelectionStart, root.textSelectionEnd)
         if (!t.isNullOrEmpty() && s in 0 until e && e <= t.length) {
             val sel = t.substring(s, e)
             if (sel.isNotBlank()) return sel
