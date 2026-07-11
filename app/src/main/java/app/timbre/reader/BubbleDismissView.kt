@@ -9,7 +9,7 @@ import android.view.View
 /** The drag-to-dismiss target: graphite disc, dual keyline, cream X. */
 class BubbleDismissView(context: Context) : View(context) {
 
-    var hovered = false
+    var dropHighlighted = false
         set(v) { field = v; invalidate() }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -38,7 +38,7 @@ class BubbleDismissView(context: Context) : View(context) {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = dp(2.4f)
         paint.strokeCap = Paint.Cap.ROUND
-        paint.color = if (hovered) red else cream
+        paint.color = if (dropHighlighted) red else cream
         paint.alpha = 255
         val a = r * 0.42f
         canvas.drawLine(cx - a, cy - a, cx + a, cy + a, paint)
