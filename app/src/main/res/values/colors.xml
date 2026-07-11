@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#101013</color>
+    <color name="card">#18181D</color>
+    <color name="card_edge">#12FFFFFF</color>
+    <color name="ink">#F4F2EC</color>
+    <color name="ink_dim">#9B988F</color>
+    <color name="ink_faint">#605E57</color>
+    <color name="amber">#E8A33D</color>
+    <color name="amber_soft">#24E8A33D</color>
+    <color name="on_amber">#17130A</color>
+    <color name="track">#14FFFFFF</color>
+    <color name="ic_launcher_bg">#1B1B20</color>
+</resources>

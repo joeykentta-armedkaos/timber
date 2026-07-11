@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Timbre</string>
+    <string name="tagline">Select text. Hear it.</string>
+    <string name="process_text_label">Read with Timbre</string>
+
+    <string name="empty_title">Nothing to read yet</string>
+    <string name="empty_body">Paste text below — or select text in any app and choose “Read with Timbre”.</string>
+    <string name="paste_text">Paste text</string>
+
+    <string name="voice">Voice</string>
+    <string name="system_default">System default</string>
+    <string name="speed_and_pitch">Speed &amp; pitch</string>
+    <string name="speed">Speed</string>
+    <string name="pitch">Pitch</string>
+    <string name="speed_value">%1$.1f×</string>
+    <string name="percent">%1$d%%</string>
+
+    <string name="cd_play">Play</string>
+    <string name="cd_pause">Pause</string>
+    <string name="cd_stop">Stop</string>
+    <string name="cd_back_sentence">Back one sentence</string>
+    <string name="cd_paste">Paste text</string>
+    <string name="cd_voice">Choose voice</string>
+    <string name="cd_speed">Speed and pitch</string>
+
+    <string name="clipboard_empty">Nothing on the clipboard</string>
+    <string name="hint_selection">Select text in any app → tap ⋮ More → Read with Timbre</string>
+
+    <string name="bubble_service_label">Timbre bubble</string>
+    <string name="accessibility_service_description">Shows the floating Timbre bubble over other apps. Hold the bubble and select text with another finger to hear it read aloud — release to stop. Tap the bubble to read the current selection. Timbre only reads text selections aloud; nothing is stored or sent anywhere.</string>
+    <string name="bubble_title">Floating bubble</string>
+    <string name="bubble_sub_off">Read selections in any app — enable in Accessibility settings</string>
+    <string name="bubble_sub_on">On — hold the bubble, select text, release to stop</string>
+    <string name="bubble_hidden_hint">Bubble hidden. Toggle to show it again.</string>
+    <string name="cd_bubble">Floating bubble settings</string>
+</resources>
