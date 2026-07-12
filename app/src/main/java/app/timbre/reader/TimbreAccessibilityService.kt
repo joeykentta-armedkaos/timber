@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
@@ -119,6 +120,35 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
               engine?.stop()
               bubble?.state = BubbleView.State.IDLE
      }
+
+     override fun onConfigurationChanged(newConfig: Configuration) {
+      super.onConfigurationChanged(newConfig)
+      // After rotation the saved x/y can land outside the new screen
+      // bounds (the window uses FLAG_LAYOUT_NO_LIMITS, so the system
+      // will happily park it off-screen). Re-clamp once the new
+      // display metrics are in effect.
+      main.postDelayed({ clampBubbleToScreen() }, 150)
+     }
+
+     private fun clampBubbleToScreen() {
+      val wrap = bubbleWrap ?: return
+      val params = bubbleParams ?: return
+      tucked = false
+      wrap.animate().cancel()
+      wrap.alpha = 1f
+      wrap.scaleX = 1f
+      wrap.scaleY = 1f
+      val size = if (wrap.width > 0) wrap.width else dp(64f)
+      // Snap to the nearest side edge of the NEW orientation.
+      val toRight = params.x + size / 2 > screenWidth() / 2
+      val targetX = if (toRight) screenWidth() - size - dp(6f) else dp(6f)
+      params.x = targetX.coerceAtLeast(0)
+      untuckedX = params.x
+      params.y = params.y.coerceIn(dp(24f), (screenHeight() - size - dp(24f)).coerceAtLeast(dp(24f)))
+      runCatching { wm.updateViewLayout(wrap, params) }
+      prefs.edit().putInt("bubbleX", params.x).putInt("bubbleY", params.y).apply()
+      scheduleTuck()
+     }
  
      /* ------------------------------ the bubble ------------------------------ */
  
@@ -142,8 +172,12 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
                            PixelFormat.TRANSLUCENT,
                        )
               params.gravity = Gravity.TOP or Gravity.START
-              params.x = prefs.getInt("bubbleX", screenWidth() - size - dp(6f))
-              params.y = prefs.getInt("bubbleY", screenHeight() / 3)
+                      // Clamp the restored position — a location saved in another
+      // orientation may be outside the current screen.
+      params.x = prefs.getInt("bubbleX", screenWidth() - size - dp(6f))
+      .coerceIn(0, (screenWidth() - size).coerceAtLeast(0))
+      params.y = prefs.getInt("bubbleY", screenHeight() / 3)
+      .coerceIn(dp(24f), (screenHeight() - size - dp(24f)).coerceAtLeast(dp(24f)))
       
               wrap.setOnTouchListener { _, ev -> onBubbleTouch(ev) }
       
