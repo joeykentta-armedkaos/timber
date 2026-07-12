@@ -212,7 +212,9 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
                                             startWinX = params.x; startWinY = params.y
                                             dragging = false
                                             overDismiss = false
-                                            val holdMs = ViewConfiguration.getLongPressTimeout().toLong()
+                                                            // 3/4 of the system long-press timeout: snappier arming while
+                            // still scaling with the user's accessibility timing settings.
+                            val holdMs = (ViewConfiguration.getLongPressTimeout() * 3L / 4L).coerceAtLeast(250L)
                                             view.startArmingArc(holdMs)
                                             main.postDelayed(armRunnable, holdMs)
                                             return true
@@ -394,7 +396,8 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
                            if (node == null || depth > 28) return
                            if (node.packageName?.toString() == packageName) return // skip our own overlay
                            node.getBoundsInScreen(r)
-                           if (r.contains(x, y)) {
+                                       val contains = r.contains(x, y)
+                                       if (contains) {
                                             val t = node.text?.toString()?.takeIf { it.isNotBlank() }
                                                 ?: node.contentDescription?.toString()?.takeIf { it.isNotBlank() }
                                             if (t != null) {
@@ -405,7 +408,14 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
                                                                  }
                                             }
                            }
-                           for (i in 0 until node.childCount) visit(node.getChild(i), depth + 1)
+                                       // Prune: only descend into subtrees that can contain the tap.
+                                       // (Nodes with empty bounds are descended anyway — some containers
+                                       // report no bounds while their children do.) Each getChild() is a
+                                       // cross-process call, so skipping off-point branches is the
+                                       // difference between ~30 and ~3000 IPC round-trips on a busy page.
+                                       if (contains || r.isEmpty) {
+                                        for (i in 0 until node.childCount) visit(node.getChild(i), depth + 1)
+                                       }
               }
       
               visit(rootInActiveWindow, 0)
@@ -606,16 +616,23 @@ class TimbreAccessibilityService : AccessibilityService(), TtsEngine.Listener {
               return null
      }
  
-     private fun speakText(text: String) {
-              val e = engine
-              if (e == null) {
-                           toast("Timbre: speech engine not ready")
-                           return
-              }
-              toast("Timbre: reading " + text.take(24) + if (text.length > 24) "…" else "")
-              e.setRate(prefs.getFloat("rate", 1.0f))
-              e.setPitch(prefs.getFloat("pitch", 1.0f))
-              e.setVoice(e.findVoiceByName(prefs.getString("voiceName", "")))
+         /** Last voice name applied to the engine — avoids re-enumerating the
+          *  installed voices (a slow cross-process query) on every single read. */
+          private var appliedVoiceName: String? = null
+
+ private fun speakText(text: String) {
+  val e = engine
+  if (e == null) {
+   toast("Timbre: speech engine not ready")
+   return
+  }
+  e.setRate(prefs.getFloat("rate", 1.0f))
+  e.setPitch(prefs.getFloat("pitch", 1.0f))
+  val wanted = prefs.getString("voiceName", "") ?: ""
+  if (wanted != appliedVoiceName) {
+   e.setVoice(e.findVoiceByName(wanted))
+   appliedVoiceName = wanted
+  }
               e.setText(text)
               e.playFrom(0)
      }
